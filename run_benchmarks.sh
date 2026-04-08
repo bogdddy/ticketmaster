@@ -15,7 +15,7 @@ MODE=${1:-direct}
 TYPE=${2:-unnumbered}
 WORKERS=${3:-1}
 RESULTS_DIR="./results"
-BENCHMARK_FILE="benchmark_${TYPE}.txt"
+BENCHMARK_FILE="benchmarks/benchmark_${TYPE}.txt"
 
 # Validate arguments
 if [[ "$MODE" != "direct" && "$MODE" != "indirect" ]]; then
@@ -27,7 +27,7 @@ fi
 if [[ "$TYPE" != "numbered" && "$TYPE" != "unnumbered" && "$TYPE" != "contention" ]]; then
     echo "Error: TYPE must be 'numbered', 'unnumbered', or 'contention'"
     echo "Usage: $0 [direct|indirect] [numbered|unnumbered|contention] [workers]"
-    echo "Note: generate benchmarks/benchmark_contention.txt first with: python generate_contention_benchmark.py"
+    echo "Note: generate benchmarks/benchmark_contention.txt first with: python benchmarks/generate_contention_benchmark.py"
     exit 1
 fi
 

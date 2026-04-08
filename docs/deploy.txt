@@ -1,11 +1,29 @@
 DEPLOYMENT GUIDE — Scalable Concert Ticket Acquisition System
 =============================================================
 
+All commands in this guide must be run from the project root directory unless stated otherwise.
+
 PREREQUISITES
 -------------
 - Docker >= 24 and Docker Compose v2 (docker compose) installed on each VM
-- Python 3.10+ (only needed for generate_plots.py, on your local machine)
-- Ports open: 80 (NGINX), 5672/15672 (RabbitMQ), 6379 (Redis)
+- Python 3.10+ with pip (only needed for plots/generate_plots.py, on your local machine)
+- Ports open on each VM (see AWS Security Groups section for AWS-specific setup):
+    80    — NGINX (direct mode entry point)
+    5672  — RabbitMQ AMQP
+    15672 — RabbitMQ Management UI (optional, for monitoring)
+    6379  — Redis
+    8000  — worker-direct (only needed if NGINX is on a separate VM)
+
+
+REPOSITORY LAYOUT
+-----------------
+  benchmarks/   — benchmark data files (.txt) and generator scripts
+  client/       — benchmark client container (Dockerfile + client.py)
+  consumer/     — results consumer container (Dockerfile + consumer.py)
+  worker/       — ticket worker container (Dockerfile + worker.py)
+  docs/         — this file and specifications.txt
+  plots/        — generate_plots.py script; PNG outputs are also written here
+  results/      — JSONL result files written by the consumer / client
 
 
 SINGLE-VM DEPLOYMENT (all services on one machine)
@@ -33,7 +51,7 @@ SINGLE-VM DEPLOYMENT (all services on one machine)
 
 6. Generate plots after collecting results:
        pip install -r requirements-dev.txt
-       python generate_plots.py
+       python plots/generate_plots.py
        ls plots/
 
 
@@ -44,12 +62,35 @@ Recommended layout: VM-A hosts infrastructure, VM-B+ host workers.
 VM-A  (infrastructure: Redis, RabbitMQ, NGINX)
 VM-B  (worker-direct or worker-indirect, one or more)
 
+AWS SECURITY GROUPS — REQUIRED BEFORE STARTING
+  Each VM's Security Group must allow the following inbound TCP traffic.
+  Use your VPC CIDR (e.g. 10.0.0.0/16) as source for internal rules,
+  and your own IP for SSH. For quick lab testing 0.0.0.0/0 is acceptable.
+
+  VM-A inbound rules:
+    TCP 22    — SSH (your IP)
+    TCP 80    — NGINX (clients in direct mode; open to all or VM-B CIDR)
+    TCP 5672  — RabbitMQ AMQP (workers on VM-B, client in indirect mode)
+    TCP 15672 — RabbitMQ Management UI (your IP, optional)
+    TCP 6379  — Redis (workers on VM-B)
+
+  VM-B inbound rules:
+    TCP 22    — SSH (your IP)
+    TCP 8000  — worker-direct HTTP (VM-A's NGINX must reach this)
+
+  NOTE: AWS Academy lab sessions expire and may reassign public IPs.
+  Always use private IPs (10.x.x.x) for inter-service communication —
+  private IPs are stable for the lifetime of the VM instance.
+  Public IPs are only needed for your own SSH/browser access.
+
 1. On VM-A — start infrastructure only:
        docker compose up -d rabbitmq redis nginx
 
-   Note the private IP of VM-A (e.g. 10.0.0.10).
+   Note the private IP of VM-A:
+       hostname -I | awk '{print $1}'
+   Example output: 10.0.0.10 — use this in all subsequent commands.
 
-2. On VM-B — run a worker, pointing to VM-A's services:
+2. On VM-B — build and run a worker, pointing to VM-A's services:
    Direct mode:
        docker run --rm \
          -e MODE=direct \
@@ -72,13 +113,13 @@ VM-B  (worker-direct or worker-indirect, one or more)
            server 10.0.0.11:8000;
            server 10.0.0.12:8000;
        }
-   Then reload NGINX:
+   Then reload NGINX (no downtime):
        docker compose exec nginx nginx -s reload
 
 4. Start the results consumer on VM-A:
        docker compose up -d consumer
 
-5. Run the benchmark client from any VM:
+5. Run the benchmark client from any VM (mount local benchmarks/ and results/):
    Direct mode:
        docker run --rm \
          -e MODE=direct \
@@ -108,14 +149,14 @@ HIGH-CONTENTION BENCHMARK (Additional requirement 2)
 -----------------------------------------------------
 Generate a contention benchmark where 80% of requests target 5% of seats:
 
-    python generate_contention_benchmark.py
+    python benchmarks/generate_contention_benchmark.py
     # outputs: benchmarks/benchmark_contention.txt
 
 Run it:
     ./run_benchmarks.sh direct   contention 50
     ./run_benchmarks.sh indirect contention 50
 
-  (run_benchmarks.sh uses the TYPE argument to pick benchmark_<TYPE>.txt)
+  (run_benchmarks.sh uses the TYPE argument to pick benchmarks/benchmark_<TYPE>.txt)
 
 
 SERVICE OVERVIEW
@@ -132,7 +173,7 @@ SERVICE OVERVIEW
 WHY CONSUMER AND CLIENT ARE SEPARATE:
   - client.*   sends ticket purchase requests (drives the benchmark)
   - consumer.* reads the ticket_results RabbitMQ queue published by workers
-                and writes every outcome to results/results.jsonl
+                and writes every outcome to results/benchmark_<mode>_<type>.jsonl
   In indirect mode the client only fires-and-forgets into the queue; the
   consumer is the only component that captures actual success/failure outcomes.
   In direct mode the client gets results from HTTP responses directly, but the

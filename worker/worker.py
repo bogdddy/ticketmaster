@@ -1,3 +1,11 @@
+"""
+Ticket worker service. Runs in two modes:
+  direct   — FastAPI HTTP server; receives purchase requests via REST and responds synchronously.
+  indirect — RabbitMQ consumer; receives purchase requests from the ticket_requests queue
+             and publishes results to ticket_results (or a per-request reply queue).
+Consistency is enforced through atomic Redis operations (INCR for unnumbered, SETNX for numbered).
+"""
+
 import os
 import json
 import logging
