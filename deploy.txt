@@ -1,0 +1,151 @@
+DEPLOYMENT GUIDE — Scalable Concert Ticket Acquisition System
+=============================================================
+
+PREREQUISITES
+-------------
+- Docker >= 24 and Docker Compose v2 (docker compose) installed on each VM
+- Python 3.10+ (only needed for generate_plots.py, on your local machine)
+- Ports open: 80 (NGINX), 5672/15672 (RabbitMQ), 6379 (Redis)
+
+
+SINGLE-VM DEPLOYMENT (all services on one machine)
+---------------------------------------------------
+1. Clone/copy the repository onto the VM.
+
+2. Build images and start infrastructure:
+       docker compose up -d --build
+
+3. Verify all services are healthy:
+       docker compose ps
+
+4. Run a benchmark (direct mode, unnumbered tickets, 50 workers):
+       ./run_benchmarks.sh direct unnumbered 50
+
+   Other combinations:
+       ./run_benchmarks.sh direct   numbered   50
+       ./run_benchmarks.sh indirect unnumbered 50
+       ./run_benchmarks.sh indirect numbered   50
+
+5. Scale workers at runtime (dynamic scaling — Additional requirement 1):
+       docker compose up -d --scale worker-direct=4      # for direct mode
+       docker compose up -d --scale worker-indirect=4    # for indirect mode
+   NGINX will automatically round-robin across new replicas (no restart needed).
+
+6. Generate plots after collecting results:
+       pip install -r requirements-dev.txt
+       python generate_plots.py
+       ls plots/
+
+
+MULTI-VM DEPLOYMENT (distributed across AWS Academy VMs)
+---------------------------------------------------------
+Recommended layout: VM-A hosts infrastructure, VM-B+ host workers.
+
+VM-A  (infrastructure: Redis, RabbitMQ, NGINX)
+VM-B  (worker-direct or worker-indirect, one or more)
+
+1. On VM-A — start infrastructure only:
+       docker compose up -d rabbitmq redis nginx
+
+   Note the private IP of VM-A (e.g. 10.0.0.10).
+
+2. On VM-B — run a worker, pointing to VM-A's services:
+   Direct mode:
+       docker run --rm \
+         -e MODE=direct \
+         -e REDIS_HOST=10.0.0.10 \
+         -e RABBITMQ_HOST=10.0.0.10 \
+         -p 8000:8000 \
+         $(docker build -q ./worker)
+
+   Indirect mode:
+       docker run --rm \
+         -e MODE=indirect \
+         -e REDIS_HOST=10.0.0.10 \
+         -e RABBITMQ_HOST=10.0.0.10 \
+         $(docker build -q ./worker)
+
+   Launch as many worker containers on as many VMs as needed.
+
+3. For direct mode, update nginx.conf on VM-A to list worker IPs:
+       upstream worker_upstream {
+           server 10.0.0.11:8000;
+           server 10.0.0.12:8000;
+       }
+   Then reload NGINX:
+       docker compose exec nginx nginx -s reload
+
+4. Start the results consumer on VM-A:
+       docker compose up -d consumer
+
+5. Run the benchmark client from any VM:
+   Direct mode:
+       docker run --rm \
+         -e MODE=direct \
+         -e API_URL=http://10.0.0.10:80 \
+         -e TICKET_TYPE=unnumbered \
+         -e BENCHMARK_FILE=/app/benchmarks/benchmark_unnumbered.txt \
+         -e CLIENT_WORKERS=50 \
+         -e RESULTS_FILE=/app/results/results.jsonl \
+         -v $(pwd)/benchmarks:/app/benchmarks:ro \
+         -v $(pwd)/results:/app/results \
+         $(docker build -q ./client)
+
+   Indirect mode:
+       docker run --rm \
+         -e MODE=indirect \
+         -e RABBITMQ_HOST=10.0.0.10 \
+         -e TICKET_TYPE=numbered \
+         -e BENCHMARK_FILE=/app/benchmarks/benchmark_numbered.txt \
+         -e CLIENT_WORKERS=50 \
+         -e RESULTS_FILE=/app/results/results.jsonl \
+         -v $(pwd)/benchmarks:/app/benchmarks:ro \
+         -v $(pwd)/results:/app/results \
+         $(docker build -q ./client)
+
+
+HIGH-CONTENTION BENCHMARK (Additional requirement 2)
+-----------------------------------------------------
+Generate a contention benchmark where 80% of requests target 5% of seats:
+
+    python generate_contention_benchmark.py
+    # outputs: benchmarks/benchmark_contention.txt
+
+Run it:
+    ./run_benchmarks.sh direct   contention 50
+    ./run_benchmarks.sh indirect contention 50
+
+  (run_benchmarks.sh uses the TYPE argument to pick benchmark_<TYPE>.txt)
+
+
+SERVICE OVERVIEW
+----------------
+  rabbitmq       — message broker (indirect mode); management UI at :15672
+  redis          — consistency backend (atomic INCR / SETNX)
+  worker-direct  — FastAPI REST worker, scalable; sits behind NGINX
+  worker-indirect— RabbitMQ consumer worker, scalable; reads ticket_requests queue
+  nginx          — load balancer for direct mode (port 80 → worker-direct:8000)
+  consumer       — reads ticket_results queue and writes results to ./results/
+  client-direct  — benchmark driver for direct mode (used by run_benchmarks.sh)
+  client-indirect— benchmark driver for indirect mode (used by run_benchmarks.sh)
+
+WHY CONSUMER AND CLIENT ARE SEPARATE:
+  - client.*   sends ticket purchase requests (drives the benchmark)
+  - consumer.* reads the ticket_results RabbitMQ queue published by workers
+                and writes every outcome to results/results.jsonl
+  In indirect mode the client only fires-and-forgets into the queue; the
+  consumer is the only component that captures actual success/failure outcomes.
+  In direct mode the client gets results from HTTP responses directly, but the
+  consumer still records them server-side for consistency.
+
+
+RESET BETWEEN RUNS
+------------------
+    curl -X POST http://localhost:80/reset
+  or via run_benchmarks.sh (does this automatically at step [3/6]).
+
+
+RABBITMQ MANAGEMENT UI
+-----------------------
+    http://<VM-IP>:15672   (guest / guest)
+  Useful for monitoring queue depths during indirect-mode benchmarks.

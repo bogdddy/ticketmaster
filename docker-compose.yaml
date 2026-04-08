@@ -1,0 +1,175 @@
+# docker-compose.yml
+# Scalable Ticket Acquisition System
+# Supports both direct (REST) and indirect (RabbitMQ) communication
+
+services:
+  # --------------------------
+  # Infrastructure
+  # --------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------
+  # Workers (Direct Mode - REST API)
+  # Scale with: docker-compose up --scale worker-direct=N
+  # --------------------------
+  worker-direct:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      REDIS_HOST: redis
+      MODE: direct
+      PORT: 8000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000-8010:8000"  # Port range for scaling
+    deploy:
+      replicas: 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # --------------------------
+  # Workers (Indirect Mode - RabbitMQ Consumer)
+  # Scale with: docker-compose up --scale worker-indirect=N
+  # --------------------------
+  worker-indirect:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      REDIS_HOST: redis
+      MODE: indirect
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 1
+
+  # --------------------------
+  # NGINX Load Balancer (for Direct Mode)
+  # --------------------------
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - worker-direct
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+  # --------------------------
+  # Results Consumer
+  # --------------------------
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: ticket-consumer
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RESULTS_FILE: /app/results/results.jsonl
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./results:/app/results
+
+  # --------------------------
+  # Benchmark Client (Direct Mode)
+  # --------------------------
+  client-direct:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    environment:
+      MODE: direct
+      API_URL: http://nginx:80
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      REDIS_HOST: redis
+      CLIENT_WORKERS: 5
+      RESULTS_FILE: /app/results/benchmark_direct.jsonl
+    depends_on:
+      - nginx
+      - rabbitmq
+      - redis
+    volumes:
+      - ./benchmarks:/app/benchmarks:ro
+      - ./results:/app/results
+    profiles:
+      - benchmark-direct
+
+  # --------------------------
+  # Benchmark Client (Indirect Mode)
+  # --------------------------
+  client-indirect:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    environment:
+      MODE: indirect
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      REDIS_HOST: redis
+      CLIENT_WORKERS: 5
+      RESULTS_FILE: /app/results/benchmark_indirect.jsonl
+    depends_on:
+      - worker-indirect
+      - rabbitmq
+      - redis
+    volumes:
+      - ./benchmarks:/app/benchmarks:ro
+      - ./results:/app/results
+    profiles:
+      - benchmark-indirect
+
+# --------------------------
+# Networks
+# --------------------------
+networks:
+  default:
+    name: ticket-network

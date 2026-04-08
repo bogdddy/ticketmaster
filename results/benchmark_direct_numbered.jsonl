@@ -1,0 +1,1 @@
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 42.88, "throughput_ops_per_second": 606.33, "client_workers": 50, "timestamp": "2026-04-07T21:59:34.331769"}
