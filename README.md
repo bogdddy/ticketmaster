@@ -11,7 +11,7 @@ Distributed ticketing system implementing both direct (REST) and indirect (Rabbi
 ./run_benchmarks.sh indirect unnumbered 50
 ./run_benchmarks.sh indirect numbered   50
 
-# Generate plots (run from project root)
+# Generate plots 
 pip install -r requirements-dev.txt
 python plots/generate_plots.py
 
@@ -103,7 +103,6 @@ ticketing/
 
 Results are saved to `results/benchmark_<mode>_<type>.jsonl` in JSONL format.
 
-Example entry:
 ```json
 {"mode": "direct", "ticket_type": "unnumbered", "total_requests": 20000,
  "successful": 20000, "failed": 0, "total_time_seconds": 33.1,
@@ -114,5 +113,4 @@ Plots are generated in `plots/` by running `python plots/generate_plots.py`.
 
 ## Deployment
 
-For single-VM and multi-VM (AWS Academy) deployment instructions, including
-Security Group configuration, see [docs/deploy.txt](docs/deploy.txt).
+[docs/deploy.txt](docs/deploy.txt).

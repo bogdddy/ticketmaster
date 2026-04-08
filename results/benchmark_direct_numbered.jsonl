@@ -1,1 +1,3 @@
-{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 42.88, "throughput_ops_per_second": 606.33, "client_workers": 50, "timestamp": "2026-04-07T21:59:34.331769"}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 61.05, "throughput_ops_per_second": 425.83, "workers": 1}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 66.71, "throughput_ops_per_second": 389.68, "workers": 3}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 63.78, "throughput_ops_per_second": 407.59, "workers": 5}
