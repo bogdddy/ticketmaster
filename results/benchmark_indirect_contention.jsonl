@@ -1,0 +1,4 @@
+{"mode": "indirect", "ticket_type": "contention", "total_requests": 25997, "successful": 9998, "failed": 15999, "total_time_seconds": 18.73, "throughput_ops_per_second": 1388.1, "client_workers": 1}
+{"mode": "indirect", "ticket_type": "contention", "total_requests": 25997, "successful": 9998, "failed": 15999, "total_time_seconds": 19.39, "throughput_ops_per_second": 1340.86, "client_workers": 3}
+{"mode": "indirect", "ticket_type": "contention", "total_requests": 25997, "successful": 9998, "failed": 15999, "total_time_seconds": 19.53, "throughput_ops_per_second": 1331.38, "client_workers": 5}
+{"mode": "indirect", "ticket_type": "contention", "total_requests": 25997, "successful": 9998, "failed": 15999, "total_time_seconds": 19.69, "throughput_ops_per_second": 1320.26, "client_workers": 10}
