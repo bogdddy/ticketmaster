@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 # --------------------------
-# RabbitMQ Connection (for indirect mode and result publishing)
+# RabbitMQ Connection (indirect mode)
 # --------------------------
 connection = None
 channel = None
@@ -110,7 +110,7 @@ def publish_result(request_id: str, client_id: str, seat_id, success: bool, repl
         logger.error(f"Failed to publish result: {e}")
 
 # --------------------------
-# FastAPI Application (Direct Mode)
+# FastAPI endpoints (Direct Mode)
 # --------------------------
 app = FastAPI(title="Ticket Worker", version="1.0")
 

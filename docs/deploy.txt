@@ -1,13 +1,11 @@
 DEPLOYMENT GUIDE — Scalable Concert Ticket Acquisition System
 =============================================================
 
-All commands in this guide must be run from the project root directory unless stated otherwise.
-
 PREREQUISITES
 -------------
-- Docker >= 24 and Docker Compose v2 (docker compose) installed on each VM
-- Python 3.10+ with pip (only needed for plots/generate_plots.py, on your local machine)
-- Ports open on each VM (see AWS Security Groups section for AWS-specific setup):
+- Docker >= 24 and Docker Compose v2 
+- Python 3.10+ with pip 
+- Ports:
     80    — NGINX (direct mode entry point)
     5672  — RabbitMQ AMQP
     15672 — RabbitMQ Management UI (optional, for monitoring)
@@ -17,47 +15,40 @@ PREREQUISITES
 
 REPOSITORY LAYOUT
 -----------------
-  benchmarks/   — benchmark data files (.txt) and generator scripts
+  benchmarks/   — benchmark data files (.txt)
   client/       — benchmark client container (Dockerfile + client.py)
   consumer/     — results consumer container (Dockerfile + consumer.py)
   worker/       — ticket worker container (Dockerfile + worker.py)
   docs/         — this file and specifications.txt
-  plots/        — generate_plots.py script; PNG outputs are also written here
   results/      — JSONL result files written by the consumer / client
 
 
-SINGLE-VM DEPLOYMENT (all services on one machine)
+SINGLE-VM DEPLOYMENT
 ---------------------------------------------------
-1. Clone/copy the repository onto the VM.
 
-2. Build images and start infrastructure:
+1. Build images and start infrastructure:
        docker compose up -d --build
 
-3. Verify all services are healthy:
+2. Verify all services are healthy:
        docker compose ps
 
-4. Run a benchmark (direct mode, unnumbered tickets, 50 workers):
-       ./run_benchmarks.sh direct unnumbered 50
+3. Run a benchmark (direct mode, unnumbered tickets, 5 workers):
+       ./run_benchmarks.sh direct unnumbered 5
 
    Other combinations:
-       ./run_benchmarks.sh direct   numbered   50
-       ./run_benchmarks.sh indirect unnumbered 50
-       ./run_benchmarks.sh indirect numbered   50
+       ./run_benchmarks.sh direct   numbered   5
+       ./run_benchmarks.sh indirect unnumbered 5
+       ./run_benchmarks.sh indirect numbered   5
 
-5. Scale workers at runtime (dynamic scaling — Additional requirement 1):
+4. Scale workers at runtime (dynamic scaling):
        docker compose up -d --scale worker-direct=4      # for direct mode
        docker compose up -d --scale worker-indirect=4    # for indirect mode
-   NGINX will automatically round-robin across new replicas (no restart needed).
+   NGINX will automatically round-robin across new replicas.
 
-6. Generate plots after collecting results:
-       pip install -r requirements-dev.txt
-       python plots/generate_plots.py
-       ls plots/
 
 
 MULTI-VM DEPLOYMENT (distributed across AWS Academy VMs)
 ---------------------------------------------------------
-Recommended layout: VM-A hosts infrastructure, VM-B+ host workers.
 
 VM-A  (infrastructure: Redis, RabbitMQ, NGINX)
 VM-B  (worker-direct or worker-indirect, one or more)
@@ -65,30 +56,21 @@ VM-B  (worker-direct or worker-indirect, one or more)
 AWS SECURITY GROUPS — REQUIRED BEFORE STARTING
   Each VM's Security Group must allow the following inbound TCP traffic.
   Use your VPC CIDR (e.g. 10.0.0.0/16) as source for internal rules,
-  and your own IP for SSH. For quick lab testing 0.0.0.0/0 is acceptable.
+  and your own IP for SSH.
 
   VM-A inbound rules:
-    TCP 22    — SSH (your IP)
-    TCP 80    — NGINX (clients in direct mode; open to all or VM-B CIDR)
-    TCP 5672  — RabbitMQ AMQP (workers on VM-B, client in indirect mode)
-    TCP 15672 — RabbitMQ Management UI (your IP, optional)
-    TCP 6379  — Redis (workers on VM-B)
+    TCP 22    — SSH 
+    TCP 80    — NGINX 
+    TCP 5672  — RabbitMQ AMQP 
+    TCP 15672 — RabbitMQ Management UI 
+    TCP 6379  — Redis 
 
   VM-B inbound rules:
-    TCP 22    — SSH (your IP)
-    TCP 8000  — worker-direct HTTP (VM-A's NGINX must reach this)
-
-  NOTE: AWS Academy lab sessions expire and may reassign public IPs.
-  Always use private IPs (10.x.x.x) for inter-service communication —
-  private IPs are stable for the lifetime of the VM instance.
-  Public IPs are only needed for your own SSH/browser access.
+    TCP 22    — SSH 
+    TCP 8000  — worker-direct HTTP
 
 1. On VM-A — start infrastructure only:
        docker compose up -d rabbitmq redis nginx
-
-   Note the private IP of VM-A:
-       hostname -I | awk '{print $1}'
-   Example output: 10.0.0.10 — use this in all subsequent commands.
 
 2. On VM-B — build and run a worker, pointing to VM-A's services:
    Direct mode:
@@ -113,7 +95,8 @@ AWS SECURITY GROUPS — REQUIRED BEFORE STARTING
            server 10.0.0.11:8000;
            server 10.0.0.12:8000;
        }
-   Then reload NGINX (no downtime):
+       
+   reload NGINX:
        docker compose exec nginx nginx -s reload
 
 4. Start the results consumer on VM-A:
@@ -126,7 +109,7 @@ AWS SECURITY GROUPS — REQUIRED BEFORE STARTING
          -e API_URL=http://10.0.0.10:80 \
          -e TICKET_TYPE=unnumbered \
          -e BENCHMARK_FILE=/app/benchmarks/benchmark_unnumbered.txt \
-         -e CLIENT_WORKERS=50 \
+         -e CLIENT_WORKERS=5 \
          -e RESULTS_FILE=/app/results/results.jsonl \
          -v $(pwd)/benchmarks:/app/benchmarks:ro \
          -v $(pwd)/results:/app/results \
@@ -138,25 +121,18 @@ AWS SECURITY GROUPS — REQUIRED BEFORE STARTING
          -e RABBITMQ_HOST=10.0.0.10 \
          -e TICKET_TYPE=numbered \
          -e BENCHMARK_FILE=/app/benchmarks/benchmark_numbered.txt \
-         -e CLIENT_WORKERS=50 \
+         -e CLIENT_WORKERS=5 \
          -e RESULTS_FILE=/app/results/results.jsonl \
          -v $(pwd)/benchmarks:/app/benchmarks:ro \
          -v $(pwd)/results:/app/results \
          $(docker build -q ./client)
 
 
-HIGH-CONTENTION BENCHMARK (Additional requirement 2)
+HIGH-CONTENTION BENCHMARK 
 -----------------------------------------------------
-Generate a contention benchmark where 80% of requests target 5% of seats:
 
-    python benchmarks/generate_contention_benchmark.py
-    # outputs: benchmarks/benchmark_contention.txt
-
-Run it:
-    ./run_benchmarks.sh direct   contention 50
-    ./run_benchmarks.sh indirect contention 50
-
-  (run_benchmarks.sh uses the TYPE argument to pick benchmarks/benchmark_<TYPE>.txt)
+  ./run_benchmarks.sh direct   contention 5
+  ./run_benchmarks.sh indirect contention 5
 
 
 SERVICE OVERVIEW

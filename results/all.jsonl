@@ -1,0 +1,16 @@
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 61.05, "throughput_ops_per_second": 425.83, "workers": 1}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 66.71, "throughput_ops_per_second": 389.68, "workers": 3}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 63.78, "throughput_ops_per_second": 407.59, "workers": 5}
+{"mode": "direct", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 66.97, "throughput_ops_per_second": 388.21, "workers": 10}
+{"mode": "direct", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 40.21, "throughput_ops_per_second": 497.5, "workers": 1}
+{"mode": "direct", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 41.75, "throughput_ops_per_second": 479.13, "workers": 3}
+{"mode": "direct", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 41.9, "throughput_ops_per_second": 477.33, "workers": 5}
+{"mode": "direct", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 44.49, "throughput_ops_per_second": 449.58, "workers": 10}
+{"mode": "indirect", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 22.84, "throughput_ops_per_second": 1138.16, "workers": 1}
+{"mode": "indirect", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 22.71, "throughput_ops_per_second": 1144.98, "workers": 3}
+{"mode": "indirect", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 22.35, "throughput_ops_per_second": 1162.97, "workers": 5}
+{"mode": "indirect", "ticket_type": "numbered", "total_requests": 25997, "successful": 20000, "failed": 5997, "total_time_seconds": 21.94, "throughput_ops_per_second": 1184.93, "workers": 10}
+{"mode": "indirect", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 14.19, "throughput_ops_per_second": 1410.01, "workers": 1}
+{"mode": "indirect", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 14.22, "throughput_ops_per_second": 1406.91, "workers": 3}
+{"mode": "indirect", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 14.26, "throughput_ops_per_second": 1402.21, "workers": 5}
+{"mode": "indirect", "ticket_type": "unnumbered", "total_requests": 20002, "successful": 20000, "failed": 2, "total_time_seconds": 15.07, "throughput_ops_per_second": 1327.46, "workers": 10}

@@ -9,7 +9,7 @@ COPY worker.py .
 
 EXPOSE 8000
 
-# MODE can be 'direct' (HTTP server) or 'indirect' (RabbitMQ consumer)
+# MODE 'direct'or 'indirect'
 ENV MODE=direct
 
 CMD ["python", "worker.py"]
